@@ -1,2 +1,4 @@
 vexnc
 compile_commands.json
+logs/
+.cache/
