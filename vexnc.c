@@ -21,6 +21,20 @@ int mkderp(const char *name) {
   return ret;
 }
 
+int spewtxt(int fd, const char *fmt, ...) {
+  va_list va;
+  char buf[256] = {0xF0, 0x9F, 0xBF, 0xBF, '\n', 0};
+
+  va_start(va, fmt);
+  vsnprintf(buf + 5, sizeof(buf) - 5, fmt, va);
+  va_end(va);
+
+  size_t len = strlen(buf);
+  buf[len++] = '\n';
+
+  return write(fd, buf, len);
+}
+
 int spewchr(int fd, uint16_t chr) {
   char buf[4];
   int i = 0;
@@ -57,6 +71,20 @@ int openlogfile() {
 
   fdlog = fd;
   return 0;
+}
+
+void userofflog(rfbClientRec *cl) {
+  if (openlogfile()) return;
+  if (spewtxt(fdlog, "disconnect %s", cl->host) < 0)
+    perror("spewtxt");
+}
+
+enum rfbNewClientAction useronlog(rfbClientRec *cl) {
+  cl->clientGoneHook = userofflog;
+  if (openlogfile()) return RFB_CLIENT_ACCEPT;
+  if (spewtxt(fdlog, "connect %s", cl->host) < 0)
+    perror("spewtxt");
+  return RFB_CLIENT_ACCEPT;
 }
 
 void keylog(rfbBool down, rfbKeySym keySym, rfbClientRec* cl) {
@@ -97,6 +125,7 @@ int main(int argc, char const *argv[]) {
   rfbScreen->frameBuffer = (char*)im;
   rfbScreen->alwaysShared = TRUE;
   if (logdirenabled) {
+    rfbScreen->newClientHook = useronlog;
     rfbScreen->kbdAddEvent = keylog;
   }
 
